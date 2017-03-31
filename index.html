@@ -1,0 +1,315 @@
+<html>
+<head>
+<title>fencepool</title>
+<style>
+	table { border: solid black 1px; }
+	td { border: solid black 1px; }
+</style>
+</head>
+<body>
+
+<script type="text/javascript">
+	function Fencer(name, id, ingame) {
+		this.name = name;
+		this.id = id;
+		this.ingame = ingame;
+	}
+
+	function Pool(name, id) {
+		this.name = name;
+		this.id = id ;
+		this.nfencers = 0;
+		this.results = [];
+		this.fencers = [];
+		this.boutDone = [];
+
+		this.victories = [];
+		this.touchesRec = [];
+		this.touchesScored = [];
+		this.place = [];
+
+		this.removeFencer = function(fencer) {
+			var i, j;
+			var fencIdx = -1;
+
+			for (i = 0; i < this.nfencers; i++) {
+				if (this.fencers[i] === fencer) {
+					fencIdx = i;
+				} 
+			}
+
+			if (fencIdx < 0) { return; }
+
+			for (i = 0; i < this.nfencers; i++) {
+				this.results[i].splice(fencIdx, 1);
+				this.boutDone[i].splice(fencIdx, 1);
+			}
+
+			this.results.splice(fencIdx, 1);
+			this.boutDone.splice(fencIdx, 1);
+
+			this.nfencers -= 1;
+			this.fencers.splice(fencIdx, 1);
+			this.victories.splice(fencIdx, 1);
+			this.touchesRec.splice(fencIdx, 1);
+			this.touchesScored.splice(fencIdx, 1);
+			this.place.splice(fencIdx, 1);
+
+			this.calcDerivedValues();
+
+		};
+
+		this.addFencer = function(fencer) {
+			var i;
+			var fencerResult = [];
+
+			for (i = 0; i < this.nfencers; i++) {
+				if (fencer.id == this.fencers[i].id) {
+					return;
+				}
+			}
+
+			for (i = 0; i < this.nfencers; i++) {
+				this.results[i].push(0);
+				this.victories.push(0);
+				this.touchesScored.push(0);
+				this.touchesRec.push(0);
+				this.place.push(0);
+			}
+
+			this.fencers.push(fencer);
+			this.nfencers += 1;
+
+			this.results.push([]);
+			this.boutDone.push([]);
+
+			for (i = 0; i < this.nfencers; i++) {
+				this.results[this.nfencers-1].push(0);
+				this.boutDone[this.nfencers-1].push(0);
+			}
+
+			console.log("Added " + fencer.name);
+		};
+
+		this.calcDerivedValues = function() {
+			var i, j;
+
+			for (i = 0; i < this.nfencers; i++) {
+				this.victories[i] = 0;
+				this.touchesScored[i] = 0;
+				this.touchesRec[i] = 0;
+				for (j = 0; j < this.nfencers; j++) {
+					this.results[i][j] = Number(this.results[i][j]);
+					this.results[j][i] = Number(this.results[j][i]);
+					if (this.results[i][j] > this.results[j][i]) {
+						this.victories[i] += 1;
+					}
+					this.touchesRec[i] += this.results[j][i];
+					this.touchesScored[i] += this.results[i][j];
+				}
+			}
+		};
+
+		this.printResults = function(domContainer) {
+			var ret = "";
+			var i, j;
+			var cellId;
+
+			ret += "<table><tr><td>&nbsp;</td>";
+			for (i = 0; i < this.nfencers; i++) {
+				ret += "<td>" + this.fencers[i].name + "</td>";
+			}
+			ret += "<td>V</td><td>Hits scored</td><td>Hits received</td><td>HS-HR</td><td>Position</td></tr>";
+			for (i = 0; i < this.nfencers; i++) {
+				ret += "<tr><td>" + this.fencers[i].name + "</td>";
+				for (j = 0; j < this.nfencers; j++) {
+					cellId = "poolTableBoutCell___" + this.fencers[i].id + "___" + this.fencers[j].id;
+					if (i != j) {
+						if (this.boutDone[i][j] > 0) {
+							ret += "<td id=\""+cellId+"\">" + this.results[i][j].toString() + "</td>";
+						} else {
+							ret += "<td id=\""+cellId+"\">?</td>";
+						}
+					} else {
+						ret += "<td>&nbsp;</td>";
+					}
+				}
+				ret += "<td>" + this.victories[i].toString() + "</td><td>" + this.touchesScored[i].toString() + "</td>";
+				ret += "<td>" + this.touchesRec[i].toString() + "</td><td>" + (this.touchesScored[i] - this.touchesRec[i]).toString() + "</td>";
+				ret += "<td>&nbsp;</td>";
+				ret += "</tr>";
+			}
+			ret += "</table>";
+
+			domContainer.innerHTML = ret;
+			console.log(ret);
+
+			for (i = 0; i < this.nfencers; i++) {
+				 for (j = 0; j < this.nfencers; j++) {
+				 	if (i == j) { continue; }
+				 	cellId = "poolTableBoutCell___" + this.fencers[i].id.toString() + "___" + this.fencers[j].id.toString();
+					cellElem = document.getElementById(cellId);
+					console.log("A:"+cellId);
+					(function(cellElem, poolObj, i, j) {
+						cellElem.addEventListener("click", function() { console.log(poolObj.fencers[i]); poolObj.askResult(poolObj.fencers[i], poolObj.fencers[j]); });
+					})(cellElem, this, i, j);
+				}
+			}
+		};
+
+		this.addResult = function(fencer1, fencer2, val1, val2) {
+			var i, j;
+
+			for (i = 0; i < this.nfencers; i++) {
+				if (this.fencers[i] === fencer1) {
+					for (j = 0; j < this.nfencers; j++) {
+						if (this.fencers[j] === fencer2) {
+							this.results[i][j] = val1;
+							this.results[j][i] = val2;
+							this.boutDone[i][j] = 1;
+							this.boutDone[j][i] = 1;
+						} else {
+							continue;
+						}
+					}
+				} else {
+					continue;
+				}
+			}
+		};
+
+		this.askResult = function (fencer1, fencer2) {
+			var val1, val2;
+			val1 = prompt("Bout " + fencer1.name + " vs " + fencer2.name + ": Score for " + fencer1.name + "?");
+			val2 = prompt("Bout " + fencer1.name + " vs " + fencer2.name + ": Score for " + fencer2.name + "?");
+			val1 = Number(val1);
+			val2 = Number(val2);
+			this.addResult(fencer1, fencer2, val1, val2);
+			refreshPoolResults();
+		};
+	}
+
+	function generateFencerSelection(domContainer, fencers, callbackFn, callbackParams, listId, fencerFilter) {
+		var i;
+		var names = [];
+		var ids = [];
+
+		var filter = fencerFilter || function () { return true; };
+
+		for (i = 0; i < fencers.length; i++) {
+			if (filter(fencers[i])) {
+				names.push(fencers[i].name);
+				ids.push(fencers[i].id);
+			}
+		}
+
+		generateListSelection(domContainer, names, ids, callbackFn, callbackParams, listId);
+	}
+
+	function generateListSelection(domContainer, listEntryNames, listEntryIds, callbackFn, callbackParams, listId) {
+		var i;
+		var retStr;
+
+		retStr = "";
+		retStr += "<div id=\""+listId+"\" class=\"listSelection\">";
+
+		for (i = 0; i < listEntryNames.length; i++) {
+			retStr += "<div id=\""+listId+"___"+listEntryIds[i]+"\" class=\"listSelectionEntry\">";
+			retStr += listEntryNames[i];
+			retStr += "</div>";
+			console.log(listEntryIds[i]);
+		}
+
+		retStr += "</div>";
+
+		domContainer.innerHTML = retStr;
+
+		if (callbackFn) {
+			for (i = 0; i < listEntryNames.length; i++) {
+				document.getElementById(listId+"___"+listEntryIds[i]).addEventListener("click", function() { callbackFn(this.id.substring(this.id.lastIndexOf("___")+3), callbackParams); });
+			}
+		}
+	}
+
+	function generateFencerLookup(fencers) {
+		var lookup = [];
+		for (var i = 0; i < fencers.length; i++) {
+			lookup[fencers[i].id] = i;
+		}
+		return lookup;
+	}
+
+	function refreshFencerLists() { 
+		generateFencerSelection(document.getElementById("listInGameContainer"), fencers, function(fid,paras){
+			fencers[fencerLookup[fid]].ingame = 0;
+			myPool.removeFencer( fencers[fencerLookup[fid]]);
+			refreshFencerLists();
+			refreshPoolResults();
+		}, null, "fencersInList", function(fenc){return fenc.ingame>0;}); 
+		generateFencerSelection(document.getElementById("listOutGameContainer"), fencers, function(fid,paras) {
+			fencers[fencerLookup[fid]].ingame = 1;
+			myPool.addFencer(fencers[fencerLookup[fid]]);
+			refreshFencerLists();
+			refreshPoolResults();
+		}, null, "fencersOutList", function(fenc){ return fenc.ingame==0; });
+		//generateFencerSelection(document.getElementById("listAllContainer"), fencers, null, null, "fencersAllList");
+
+	}
+
+	function refreshPoolResults() {
+		myPool.calcDerivedValues();
+		myPool.printResults(document.getElementById("resultsTableContainer"));
+	}
+
+	var myPool = new Pool("new pool", "poolid");
+
+	var fencerLookup = {};  // mapping from Fencer.id -> fencers index
+	
+	var fencers = [
+		new Fencer("Matti", "1", 0),
+		new Fencer("Liisa", 2, 0),
+		new Fencer("Heikki", "3", 0),
+		new Fencer("Tapani", 4, 0),
+		new Fencer("Jaana", 5, 0)
+	];
+
+	fencerLookup = generateFencerLookup(fencers);
+
+</script>
+
+<button id="buttonRefreshPlayers">refresh player lists</button>
+
+<h1>In</h1>
+<div id="listInGameContainer"></div>
+<h1>Out</h1>
+<div id="listOutGameContainer"></div>
+
+<button id="buttonCreatePool">create pool</button>
+<button id="buttonRefreshResults">refresh results</button>
+
+<h1>Results</h1>
+<div id="resultsTableContainer"></div>
+
+<script type="text/javascript">
+	document.getElementById("buttonRefreshPlayers").addEventListener("click", refreshFencerLists);
+
+	document.getElementById("buttonCreatePool").addEventListener("click", function(){
+		var i;
+
+		for (i = 0; i < fencers.length; i++) {
+			console.log(fencers[i]);
+			if (fencers[i].ingame > 0) {
+				myPool.addFencer(fencers[i]);
+			}
+		}
+	});
+
+	document.getElementById("buttonRefreshResults").addEventListener("click", refreshPoolResults);
+	
+	refreshPoolResults();
+	refreshFencerLists();
+</script>
+
+
+</body>
+</html>
